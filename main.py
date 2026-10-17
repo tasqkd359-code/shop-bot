@@ -1,151 +1,156 @@
-import os
-import json
 import discord
 from discord.ext import commands
+from discord.ui import Button, View, Modal, TextInput
 
-# إعداد الصلاحيات
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
+intents.guilds = True
 
-bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+# تعيين بادئة الأوامر
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-DB_FILE = 'shop_db.json'
+# ==================== 1. نظام تشفير الإعلانات ====================
+class EncryptModal(Modal, title="خدمة التشفير الآلي الاحترافية 🛡️"):
+    ad_content = TextInput(
+        label="اكتب إعلانك أو سلعَتَك هنا",
+        style=discord.TextStyle.paragraph,
+        placeholder="اكتب تفاصيل السلعة، السعر، وكيفية التواصل...",
+        required=True,
+        max_length=1000
+    )
 
-def load_db():
-    if not os.path.exists(DB_FILE):
-        return {"users": {}, "products": {}}
-    try:
-        with open(DB_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {"users": {}, "products": {}}
+    async def on_submit(self, interaction: discord.Interaction):
+        encrypted_text = (
+            f"╔══════════════════════════════╗\n"
+            f" 🛒 **إعلان معتمد من:** {interaction.user.mention}\n"
+            f"--------------------------------------------------\n"
+            f"{self.ad_content.value}\n"
+            f"╚══════════════════════════════╝"
+        )
+        await interaction.response.send_message(
+            f"✨ **تم تشفير إعلانك بنجاح وجاهز للنسخ:**\n{encrypted_text}", 
+            ephemeral=True
+        )
 
-def save_db(data):
-    with open(DB_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+class EncryptView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="اضغط لتشفير إعلانك 🔐", style=discord.ButtonStyle.primary, custom_id="encrypt_btn")
+    async def encrypt_button(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(EncryptModal())
+
+# ==================== 2. نظام شراء المتجر & الأمان (الإضافة الجديدة) ====================
+class ShopBuyView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🛒 شراء متجر", style=discord.ButtonStyle.primary, custom_id="buy_shop_btn")
+    async def buy_shop(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_message("🎟️ تم فتح تذكرة طلب المتجر بنجاح! توجه لروم التذاكر للإكمال.", ephemeral=True)
+
+    @discord.ui.button(label="📊 أسعار المتاجر", style=discord.ButtonStyle.secondary, custom_id="shop_prices_btn")
+    async def shop_prices(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(
+            title="✨ قائمة أسعار وباقات المتاجر",
+            description="1️⃣ **متجر عادي:** 5k كريدت / شهر\n2️⃣ **متجر مميز (VIP):** 10k كريدت + روم خاص مميز!",
+            color=discord.Color.blurple()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="🛡️ طلب وسيط آمن", style=discord.ButtonStyle.success, custom_id="middleman_btn")
+    async def middleman_ticket(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_message("🔒 تم فتح تذكرة طلب وسيط لضمان حقك وحق البائع من النصب!", ephemeral=True)
+
+    @discord.ui.button(label="⭐ تقييم المتجر", style=discord.ButtonStyle.danger, custom_id="rate_shop_btn")
+    async def rate_shop(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(RateModal())
+
+# نظام نافذة التقييم
+class RateModal(Modal, title="تقييم تجربة الشراء ⭐"):
+    rating = TextInput(label="التقييم من 5 نجوم (مثال: ⭐⭐⭐⭐⭐)", placeholder="اكتب النجوم هنا...", max_length=10)
+    feedback = TextInput(label="رأيك في المتجر / الخدمة", style=discord.TextStyle.paragraph, placeholder="اكتب تعليقك هنا...")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.send_message(f"❤️ شكراً لتقييمك! تم إرسال رأيك بنجاح لدعم المتجر.", ephemeral=True)
 
 @bot.event
 async def on_ready():
-    print(f'تم تسجيل الدخول بنجاح باسم: {bot.user}')
+    print(f"تم تسجيل الدخول بنجاح باسم: {bot.user.name}")
+    print("البوت يعمل بأعلى أداء ومزود بكل الأفكار الاحترافية!")
 
-# --- أمر قائمة الأوامر ---
-@bot.command(name="اوامر", aliases=["الاوامر", "help"])
-async def show_help(ctx):
+# ==================== الأوامر واللوحات المحدثة ====================
+
+@bot.command(name="تشفير", help="إرسال لوحة التشفير الآلي")
+@commands.has_permissions(administrator=True)
+async def setup_encrypt(ctx):
+    await ctx.message.delete()
     embed = discord.Embed(
-        title="🛒 قائمة أوامر بوت الشوب",
-        description="إليك جميع الأوامر المتاحة لاستخدام البوت:",
+        title="خدمة التشفير الآلي للإعلانات 🛡️",
+        description="اضغط على الزر بالأسفل، اكتب إعلانك، وسأعطيك النسخة المشفرة المنظمة تماماً!",
+        color=discord.Color.dark_embed()
+    )
+    await ctx.send(embed=embed, view=EncryptView())
+
+@bot.command(name="متجر", help="إرسال لوحة شراء المتاجر والأمان")
+@commands.has_permissions(administrator=True)
+async def setup_shop(ctx):
+    await ctx.message.delete()
+    embed = discord.Embed(
+        title="✨ | Thunder Shop | متجر السيرفر الرسمي",
+        description="شراء المتاجر، طلب الوسطاء الآمنين، وتقييم التجار بكل سهولة!\n\nقم بالاختيار من الأزرار بالأسفل 👇",
+        color=discord.Color.dark_theme()
+    )
+    embed.set_footer(text="Dev By : Your Name - Powered by Advanced System")
+    await ctx.send(embed=embed, view=ShopBuyView())
+
+@bot.command(name="قوانين", help="إرسال قوانين المتاجر")
+@commands.has_permissions(administrator=True)
+async def rules_panel(ctx):
+    await ctx.message.delete()
+    embed = discord.Embed(
+        title="قوانين المتاجر الرسمية",
+        description="**قوانين متاجر thunder shop**\n\n"
+                    "• يمنع السب والخطأ بالمتجر نهائياً ⚠️\n"
+                    "• يمنع الترويج لسيرفرات أو جهات خارجية ❌\n"
+                    "• يمنع السبام بين كل رسالة وإعلان (المدة المحددة: 30 دقيقة)\n"
+                    "• الحد الأقصى للمتاجر لكل شخص: ( 2 ) فقط !\n"
+                    "• يمنع منعاً باتاً بيع الكريدت بطرق مشبوهة\n"
+                    "• يمنع كتابة نقاط (.) أو رموز فارغة لنشر السلعة\n"
+                    "• عدم التفاعل في المتجر لمدة 7 أيام = حذف المتجر وتفريغه 🗑️\n\n"
+                    "**⚠️ عدم قراءة القوانين ليس عذراً أبداً!**",
         color=discord.Color.blue()
     )
-    
-    embed.add_field(
-        name="👑 أوامر الإدارة",
-        value=(
-            "`!اضافة_منتج <الكود> \"<الاسم>\" <السعر>` - إضافة منتج جديد للمتجر\n"
-            "`!تعبئة_مخزون <كود المنتج> <الكود1> <الكود2> ...` - إضافة أكواد للمخزون\n"
-            "`!اضافة_رصيد @العضو <المبلغ>` - شحن رصيد لعضو معين"
-        ),
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🛒 أوامر الأعضاء",
-        value=(
-            "`!المتجر` - عرض جميع المنتجات والأسعار والمخزون\n"
-            "`!رصيدي` - معرفة رصيدك الحالي في المتجر\n"
-            "`!شراء <كود المنتج>` - شراء منتج واستلام الكود في الخاص"
-        ),
-        inline=False
-    )
-    
-    embed.set_footer(text="نتمنى لك تجربة تسوق ممتعة!")
     await ctx.send(embed=embed)
 
-# --- أوامر المتجر ---
-@bot.command(name="اضافة_منتج")
+@bot.command(name="اوامر", help="عرض قائمة الأوامر الشاملة")
 @commands.has_permissions(administrator=True)
-async def add_product(ctx, code: str, name: str, price: float):
-    db = load_db()
-    db["products"][code] = {"name": name, "price": price, "stock": []}
-    save_db(db)
-    await ctx.send(f"✅ تم إضافة المنتج **{name}** (الكود: `{code}`) بسعر **{price}** بنجاح!")
-
-@bot.command(name="تعبئة_مخزون")
-@commands.has_permissions(administrator=True)
-async def restock(ctx, code: str, *items: str):
-    db = load_db()
-    if code not in db["products"]:
-        await ctx.send("❌ هذا المنتج غير موجود!")
-        return
-    db["products"][code]["stock"].extend(items)
-    save_db(db)
-    await ctx.send(f"📦 تم إضافة {len(items)} عنصر/كود إلى مخزون **{db['products'][code]['name']}**.")
-
-@bot.command(name="اضافة_رصيد")
-@commands.has_permissions(administrator=True)
-async def add_balance(ctx, member: discord.Member, amount: float):
-    db = load_db()
-    user_id = str(member.id)
-    db["users"][user_id] = db["users"].get(user_id, 0) + amount
-    save_db(db)
-    await ctx.send(f"💰 تم إضافة **{amount}** إلى رصيد {member.mention}. الرصيد الحالي: **{db['users'][user_id]}**")
-
-@bot.command(name="المتجر")
-async def show_shop(ctx):
-    db = load_db()
-    products = db.get("products", {})
-    if not products:
-        await ctx.send("🛒 المتجر فارغ حالياً!")
-        return
-    
-    embed = discord.Embed(title="🏪 قائمة المنتجات المتاحة", color=discord.Color.green())
-    for code, info in products.items():
-        stock_count = len(info.get("stock", []))
-        embed.add_field(
-            name=f"{info['name']} (كود: `{code}`)",
-            value=f"💵 السعر: **{info['price']}** | 📦 المتوفر: **{stock_count}**",
-            inline=False
-        )
+async def help_panel(ctx):
+    await ctx.message.delete()
+    embed = discord.Embed(
+        title="📋 لوحة التحكم والأوامر الكاملة",
+        description="جميع الأوامر تحذف نفسها تلقائياً للحفاظ على نظافة الرومات وجماليتها:",
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="🔧 `!تشفير`", value="إرسال لوحة التشفير الآلي للإعلانات.", inline=False)
+    embed.add_field(name="🛒 `!متجر`", value="إرسال لوحة المتاجر الشاملة (شراء، أسعار، وسطاء، تقييمات).", inline=False)
+    embed.add_field(name="📜 `!قوانين`", value="إرسال لوحة قوانين الشروط والأحكام.", inline=False)
+    embed.add_field(name="📊 `!احصائيات`", value="عرض حالة البوت وسرعة الاستجابة.", inline=False)
+    embed.set_footer(text="نظام احترافي متكامل لخدمة المتاجر ✨")
     await ctx.send(embed=embed)
 
-@bot.command(name="رصيدي")
-async def check_balance(ctx):
-    db = load_db()
-    user_id = str(ctx.author.id)
-    balance = db["users"].get(user_id, 0)
-    await ctx.send(f"💳 رصيدك الحالي هو: **{balance}**")
+@bot.command(name="احصائيات", help="معرفة حالة البوت")
+@commands.has_permissions(administrator=True)
+async def stats_panel(ctx):
+    await ctx.message.delete()
+    embed = discord.Embed(
+        title="📊 لوحة إحصائيات النظام",
+        description=f"✅ **حالة البوت:** متصل ويعمل بكامل الطاقة\n"
+                    f"⚡ **سرعة الاستجابة (Ping):** {round(bot.latency * 1000)}ms\n"
+                    f"👥 **السيرفرات المحمية:** {len(bot.guilds)}",
+        color=discord.Color.green()
+    )
+    await ctx.send(embed=embed)
 
-@bot.command(name="شراء")
-async def buy(ctx, code: str):
-    db = load_db()
-    user_id = str(ctx.author.id)
-    user_balance = db["users"].get(user_id, 0)
-    
-    if code not in db["products"]:
-        await ctx.send("❌ المنتج غير موجود!")
-        return
-    
-    product = db["products"][code]
-    if user_balance < product["price"]:
-        await ctx.send(f"❌ رصيدك غير كافٍ! سعر المنتج **{product['price']}** ورصيدك الحالي **{user_balance}**.")
-        return
-    
-    if not product["stock"]:
-        await ctx.send("❌ عذراً، هذا المنتج غير متوفر بالمخزون حالياً!")
-        return
-    
-    item = product["stock"].pop(0)
-    db["users"][user_id] -= product["price"]
-    save_db(db)
-    
-    try:
-        await ctx.author.send(f"🎉 شكراً لشراء **{product['name']}**!\n🎁 الكود الخاص بك هو:\n```{item}```")
-        await ctx.send(f"✅ تم الشراء بنجاح! تم إرسال المنتج إلى الخاص بك يا {ctx.author.mention}.")
-    except discord.Forbidden:
-        await ctx.send(f"⚠️ تم الشراء وخصم المبلغ، ولكن الخاص لديك مغلق! يرجى فتحه ثم التواصل مع الإدارة لاستلام المنتج.")
-
-TOKEN = os.getenv('TOKEN')
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("خطأ: لم يتم العثور على متغير البيئة TOKEN!")
+# ضع توكن بوتك هنا
+bot.run("MTU1OTQ5Mjg4OTc3ODg1NTk4Ng.GyD9vk.YMTuYFcHBv26Pd2qbOa5GbDVzwRdtElYCoywFk")
